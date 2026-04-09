@@ -1,23 +1,64 @@
-import express from "express"
+import http from "http"
 
-const app = express()
-app.use(express.json())
-
-app.get("/", (_req, res) => {
-  res.json({ ok: true, service: "running" })
-})
-
-app.post("/session/start", (req, res) => {
-  res.json({ ok: true, body: req.body })
-})
-
-app.get("/session/:botId/status", (req, res) => {
-  res.json({ status: "ok", botId: req.params.botId })
-})
-
-// 🔥 IMPORTANTE: usar 0.0.0.0
 const PORT = process.env.PORT || 3000
+const HOST = "0.0.0.0"
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`)
+const server = http.createServer((req, res) => {
+  res.setHeader("Content-Type", "application/json")
+
+  if (req.method === "GET" && req.url === "/") {
+    res.writeHead(200)
+    res.end(JSON.stringify({ ok: true, service: "running" }))
+    return
+  }
+
+  if (req.method === "GET" && req.url.startsWith("/session/")) {
+    const parts = req.url.split("/")
+    const botId = parts[2] || null
+    const last = parts[3] || null
+
+    if (last === "status") {
+      res.writeHead(200)
+      res.end(JSON.stringify({ status: "ok", botId }))
+      return
+    }
+
+    res.writeHead(404)
+    res.end(JSON.stringify({ error: "not_found" }))
+    return
+  }
+
+  if (req.method === "POST" && req.url === "/session/start") {
+    let body = ""
+
+    req.on("data", chunk => {
+      body += chunk.toString()
+    })
+
+    req.on("end", () => {
+      res.writeHead(200)
+      res.end(JSON.stringify({ ok: true, rawBody: body }))
+    })
+
+    return
+  }
+
+  res.writeHead(404)
+  res.end(JSON.stringify({ error: "not_found" }))
 })
+
+server.listen(PORT, HOST, () => {
+  console.log(`HTTP server escuchando en ${HOST}:${PORT}`)
+})
+
+process.on("uncaughtException", err => {
+  console.error("uncaughtException:", err)
+})
+
+process.on("unhandledRejection", err => {
+  console.error("unhandledRejection:", err)
+})
+
+setInterval(() => {
+  console.log("heartbeat", new Date().toISOString())
+}, 15000)
